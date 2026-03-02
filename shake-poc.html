@@ -127,11 +127,11 @@
   'use strict';
 
   // ── Constants ──────────────────────────────────────────────
-  const DETECT_THRESHOLD  = 8;   // m/s² — any intentional shake
-  const HARD_THRESHOLD    = 15;  // m/s² — solid deliberate shake
+  const DETECT_THRESHOLD  = 5;   // m/s² — any intentional shake
+  const HARD_THRESHOLD    = 10;  // m/s² — solid deliberate shake
   const OPEN_DURATION_MS  = 2000; // ms of hard shaking needed
   const SOFT_DELAY_MS     = 1500; // ms before showing "Shake Harder"
-  const SAMPLE_WINDOW     = 5;    // samples to average
+  const SAMPLE_WINDOW     = 3;    // samples to average (smaller = more peak-sensitive)
   const VIBRATE_TICK_MS   = 200;  // ms between continuous shake pulses
 
   // ── Vibration ──────────────────────────────────────────────
@@ -144,10 +144,11 @@
     if (!CAN_VIBRATE) return;
     if (now - lastVibrateTick < VIBRATE_TICK_MS) return;
     lastVibrateTick = now;
-    // Scale pulse: 10ms at DETECT_THRESHOLD → 40ms at HARD_THRESHOLD
+    // Scale pulse: 30ms at DETECT_THRESHOLD → 100ms at HARD_THRESHOLD
+    // (Android motors need ≥30ms to produce perceptible haptic feedback)
     const t = Math.max(0, Math.min(1,
       (mag - DETECT_THRESHOLD) / (HARD_THRESHOLD - DETECT_THRESHOLD)));
-    navigator.vibrate([Math.round(10 + t * 30)]);
+    navigator.vibrate([Math.round(30 + t * 70)]);
   }
 
   // ── Audio ───────────────────────────────────────────────────
@@ -264,6 +265,11 @@
   }
 
   // ── Motion processing ──────────────────────────────────────
+  // Low-pass gravity estimate for the accelerationIncludingGravity fallback.
+  // ALPHA=0.9 at ~60Hz gives ~1.5Hz cutoff — tracks gravity, not shaking.
+  let gravX = 0, gravY = 0, gravZ = 9.81;
+  const GRAV_ALPHA = 0.9;
+
   function getMagnitude(event) {
     let ax, ay, az;
 
@@ -274,10 +280,16 @@
       az = event.acceleration.z;
     } else if (event.accelerationIncludingGravity &&
                event.accelerationIncludingGravity.x != null) {
-      // crude gravity removal on z axis
-      ax = event.accelerationIncludingGravity.x;
-      ay = event.accelerationIncludingGravity.y;
-      az = (event.accelerationIncludingGravity.z || 0) - 9.81;
+      // High-pass filter: remove running gravity estimate from all axes
+      const rx = event.accelerationIncludingGravity.x;
+      const ry = event.accelerationIncludingGravity.y;
+      const rz = event.accelerationIncludingGravity.z;
+      gravX = GRAV_ALPHA * gravX + (1 - GRAV_ALPHA) * rx;
+      gravY = GRAV_ALPHA * gravY + (1 - GRAV_ALPHA) * ry;
+      gravZ = GRAV_ALPHA * gravZ + (1 - GRAV_ALPHA) * rz;
+      ax = rx - gravX;
+      ay = ry - gravY;
+      az = rz - gravZ;
     } else {
       return 0;
     }
@@ -298,7 +310,7 @@
     const mag  = smoothedMagnitude(raw);
     const now  = performance.now();
 
-    debugEl.textContent = `accel: ${mag.toFixed(1)} m/s²  |  state: ${state}`;
+    debugEl.textContent = `raw:${raw.toFixed(1)} avg:${mag.toFixed(1)} m/s² | ${state} | vib:${CAN_VIBRATE ? '✓' : '✗'}`;
 
     if (mag >= HARD_THRESHOLD) {
       // Hard shaking ─────────────────────────────────────────
