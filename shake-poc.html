@@ -401,12 +401,6 @@
 
   startBtn.addEventListener('click', requestPermission);
 
-  // Auto-start on non-iOS where no permission is needed
-  if (typeof DeviceMotionEvent === 'undefined' ||
-      typeof DeviceMotionEvent.requestPermission !== 'function') {
-    startListening();
-    startBtn.classList.add('hidden');
-  }
 
 })();
 </script>
