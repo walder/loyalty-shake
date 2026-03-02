@@ -156,7 +156,7 @@
       gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
       if (shakeSource) {
         // Source läuft bereits – nur Gain hochfahren
-        gainNode.gain.setTargetAtTime(0.6, audioCtx.currentTime, 0.1);
+        gainNode.gain.setTargetAtTime(0.6, audioCtx.currentTime, 0.05);
         return;
       }
       shakeSource = audioCtx.createBufferSource();
@@ -164,7 +164,7 @@
       shakeSource.loop = true;
       shakeSource.connect(gainNode);
       shakeSource.start();
-      gainNode.gain.setTargetAtTime(0.6, audioCtx.currentTime, 0.1);
+      gainNode.gain.setTargetAtTime(0.6, audioCtx.currentTime, 0.05);
     };
     if (audioCtx.state !== 'running') {
       audioCtx.resume().then(doStart);
