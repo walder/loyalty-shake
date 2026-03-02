@@ -352,7 +352,11 @@
       vibrate(0);
 
 
-      if (state !== 'idle') applyState('idle');
+      if (state === 'shake_harder') {
+        stopShakeSound(false); // sound aus, text + animation bleiben
+      } else if (state !== 'idle') {
+        applyState('idle');
+      }
     }
   }
 
