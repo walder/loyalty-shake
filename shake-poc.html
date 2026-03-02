@@ -21,53 +21,13 @@
     }
 
     #status-text {
+      display: none;
       font-size: clamp(2.5rem, 12vw, 5rem);
       font-weight: 800;
       letter-spacing: -0.02em;
       text-align: center;
       transition: color 0.3s ease;
       line-height: 1.1;
-    }
-
-    /* Ring progress */
-    #ring-wrap {
-      margin-top: 2.5rem;
-      position: relative;
-      width: 140px;
-      height: 140px;
-    }
-
-    #ring-svg {
-      width: 140px;
-      height: 140px;
-      transform: rotate(-90deg);
-    }
-
-    #ring-bg {
-      fill: none;
-      stroke: #333;
-      stroke-width: 10;
-    }
-
-    #ring-progress {
-      fill: none;
-      stroke: #4caf50;
-      stroke-width: 10;
-      stroke-linecap: round;
-      stroke-dasharray: 376; /* 2π × 60 ≈ 376.99 */
-      stroke-dashoffset: 376;
-      transition: stroke-dashoffset 0.2s linear, stroke 0.3s ease;
-    }
-
-    #ring-pct {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: #aaa;
     }
 
     /* Start button (iOS permission) */
@@ -109,14 +69,6 @@
 <body class="state-idle">
 
   <div id="status-text">Shake It</div>
-
-  <div id="ring-wrap">
-    <svg id="ring-svg" viewBox="0 0 140 140">
-      <circle id="ring-bg" cx="70" cy="70" r="60"/>
-      <circle id="ring-progress" cx="70" cy="70" r="60"/>
-    </svg>
-    <div id="ring-pct">0%</div>
-  </div>
 
   <button id="start-btn">Start</button>
 
@@ -184,13 +136,20 @@
 
   function startShakeSound() {
     if (!audioCtx || !shakeBuffer || shakeSource) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    shakeSource = audioCtx.createBufferSource();
-    shakeSource.buffer = shakeBuffer;
-    shakeSource.loop = true;
-    shakeSource.connect(gainNode);
-    shakeSource.start();
-    gainNode.gain.setTargetAtTime(0.6, audioCtx.currentTime, 0.08);
+    const doStart = () => {
+      if (shakeSource) return; // re-check nach async resume
+      shakeSource = audioCtx.createBufferSource();
+      shakeSource.buffer = shakeBuffer;
+      shakeSource.loop = true;
+      shakeSource.connect(gainNode);
+      shakeSource.start();
+      gainNode.gain.setTargetAtTime(0.6, audioCtx.currentTime, 0.08);
+    };
+    if (audioCtx.state !== 'running') {
+      audioCtx.resume().then(doStart);
+    } else {
+      doStart();
+    }
   }
 
   function stopShakeSound() {
@@ -220,12 +179,9 @@
   // ── DOM refs ───────────────────────────────────────────────
   const bodyEl       = document.body;
   const statusEl     = document.getElementById('status-text');
-  const ringProgress = document.getElementById('ring-progress');
-  const ringPct      = document.getElementById('ring-pct');
   const startBtn     = document.getElementById('start-btn');
   const debugEl      = document.getElementById('debug');
 
-  const CIRCUMFERENCE = 2 * Math.PI * 60; // ≈ 376.99
 
   // ── UI helpers ─────────────────────────────────────────────
   const STATE_CONFIG = {
@@ -254,16 +210,6 @@
     statusEl.textContent = cfg.label;
     statusEl.style.color = cfg.color;
     bodyEl.className = cfg.cls;
-    if (newState !== 'opened') {
-      setRing(0);
-    }
-  }
-
-  function setRing(fraction) {
-    const offset = CIRCUMFERENCE * (1 - Math.min(1, Math.max(0, fraction)));
-    ringProgress.style.strokeDashoffset = offset.toFixed(1);
-    const pct = Math.round(fraction * 100);
-    ringPct.textContent = pct + '%';
   }
 
   // ── Motion processing ──────────────────────────────────────
@@ -321,7 +267,7 @@
 
       const elapsed = now - hardShakingSince;
       const fraction = elapsed / OPEN_DURATION_MS;
-      setRing(fraction);
+
 
       setShakeVolume(mag);
 
@@ -339,13 +285,13 @@
       if (elapsed >= OPEN_DURATION_MS) {
         applyState('opened');
         locked = true;
-        setRing(1);
+
       }
 
     } else if (mag >= DETECT_THRESHOLD) {
       // Soft shaking ─────────────────────────────────────────
       hardShakingSince = null;
-      setRing(0);
+
 
       setShakeVolume(mag);
       vibrateShakeTick(mag);
@@ -364,7 +310,7 @@
       hardShakingSince = null;
       softShakingSince = null;
       vibrate(0);
-      setRing(0);
+
 
       if (state !== 'idle') applyState('idle');
     }
@@ -373,10 +319,11 @@
   // ── Permission / setup ─────────────────────────────────────
   function startListening() {
     initAudio();
-    // Resume on any touch (needed when AudioContext was created before user gesture)
+    if (audioCtx) audioCtx.resume(); // direkt in der User-Geste resumieren
     document.addEventListener('touchstart', () => { if (audioCtx) audioCtx.resume(); }, { once: true });
     window.addEventListener('devicemotion', onDeviceMotion);
     startBtn.classList.add('hidden');
+    statusEl.style.display = '';
   }
 
   function requestPermission() {
