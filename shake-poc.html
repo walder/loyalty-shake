@@ -79,6 +79,14 @@
     body.state-shaking { --accent: #fb8c00; }
     body.state-shake-harder { --accent: #e53935; }
     body.state-opened  { --accent: #43a047; }
+
+    @keyframes shake-harder-pulse {
+      0%, 100% { transform: scale(1);    opacity: 1; }
+      50%      { transform: scale(1.08); opacity: 0.75; }
+    }
+    body.state-shake-harder #status-text {
+      animation: shake-harder-pulse 0.5s ease-in-out infinite;
+    }
   </style>
 </head>
 <body class="state-idle">
@@ -215,9 +223,9 @@
   // ── UI helpers ─────────────────────────────────────────────
   const STATE_CONFIG = {
     idle:         { label: 'Shake It',     cls: 'state-idle',         color: '#e53935' },
-    shaking:      { label: 'Shaking',      cls: 'state-shaking',      color: '#fb8c00' },
-    shake_harder: { label: 'Shake Harder', cls: 'state-shake-harder', color: '#e53935' },
-    opened:       { label: 'Opened!',      cls: 'state-opened',       color: '#43a047' },
+    shaking:      { label: 'Mixing Drink',      cls: 'state-shaking',      color: '#fb8c00' },
+    shake_harder: { label: 'Shake Harder!',      cls: 'state-shake-harder', color: '#ff1744' },
+    opened:       { label: 'Drink Mixed!',      cls: 'state-opened',       color: '#43a047' },
   };
 
   function applyState(newState) {
@@ -312,14 +320,7 @@
 
       vibrateShakeTick(mag);
 
-      if (state !== 'shaking' && state !== 'opened') applyState('shaking');
-      else if (state !== 'opened') {
-        // keep label as "Shaking" while ring fills
-        if (statusEl.textContent !== 'Shaking') statusEl.textContent = 'Shaking';
-        statusEl.style.color = STATE_CONFIG.shaking.color;
-        bodyEl.className = STATE_CONFIG.shaking.cls;
-        state = 'shaking';
-      }
+      if (state !== 'shaking' && state !== 'shake_harder' && state !== 'opened') applyState('shaking');
 
       if (elapsed >= OPEN_DURATION_MS) {
         applyState('opened');
