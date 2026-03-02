@@ -132,23 +132,27 @@
   const OPEN_DURATION_MS  = 2000; // ms of hard shaking needed
   const SOFT_DELAY_MS     = 1500; // ms before showing "Shake Harder"
   const SAMPLE_WINDOW     = 3;    // samples to average (smaller = more peak-sensitive)
-  const VIBRATE_TICK_MS   = 200;  // ms between continuous shake pulses
+  const VIBRATE_MUTEX_MS  = 1000; // ms minimum between any two vibrate starts
 
   // ── Vibration ──────────────────────────────────────────────
   const CAN_VIBRATE = 'vibrate' in navigator;
+  let lastVibrateMs = 0;
+
   function vibrate(pattern) {
-    if (CAN_VIBRATE) navigator.vibrate(pattern);
+    if (!CAN_VIBRATE) return;
+    if (pattern === 0) { navigator.vibrate(0); return; } // stop always goes through
+    const now = performance.now();
+    if (now - lastVibrateMs < VIBRATE_MUTEX_MS) return;
+    lastVibrateMs = now;
+    navigator.vibrate(pattern);
   }
 
-  function vibrateShakeTick(mag, now) {
-    if (!CAN_VIBRATE) return;
-    if (now - lastVibrateTick < VIBRATE_TICK_MS) return;
-    lastVibrateTick = now;
+  function vibrateShakeTick(mag) {
     // Scale pulse: 30ms at DETECT_THRESHOLD → 100ms at HARD_THRESHOLD
     // (Android motors need ≥30ms to produce perceptible haptic feedback)
     const t = Math.max(0, Math.min(1,
       (mag - DETECT_THRESHOLD) / (HARD_THRESHOLD - DETECT_THRESHOLD)));
-    navigator.vibrate([Math.round(30 + t * 70)]);
+    vibrate([Math.round(30 + t * 70)]);
   }
 
   // ── Audio ───────────────────────────────────────────────────
@@ -211,7 +215,6 @@
 
   let softShakingSince = null;   // timestamp when soft shaking began
   let hardShakingSince = null;   // timestamp when hard shaking began
-  let lastVibrateTick  = 0;      // timestamp of last progress-tick vibration
 
   const samples = [];            // rolling window of magnitude values
 
@@ -323,7 +326,7 @@
 
       setShakeVolume(mag);
 
-      vibrateShakeTick(mag, now);
+      vibrateShakeTick(mag);
 
       if (state !== 'shaking' && state !== 'opened') applyState('shaking');
       else if (state !== 'opened') {
@@ -346,7 +349,7 @@
       setRing(0);
 
       setShakeVolume(mag);
-      vibrateShakeTick(mag, now);
+      vibrateShakeTick(mag);
 
       if (softShakingSince === null) softShakingSince = now;
       const softElapsed = now - softShakingSince;
@@ -361,7 +364,6 @@
       // Below detect threshold ────────────────────────────────
       hardShakingSince = null;
       softShakingSince = null;
-      lastVibrateTick = 0;
       vibrate(0);
       setRing(0);
 
