@@ -178,7 +178,7 @@
   function stopShakeSound(hard = false) {
     if (!shakeSource) return;
     gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
-    gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, hard ? 0.1 : 0.3);
+    gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, hard ? 0.1 : 0.05);
     if (hard) {
       const src = shakeSource;
       shakeSource = null;
