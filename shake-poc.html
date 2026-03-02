@@ -127,8 +127,8 @@
   'use strict';
 
   // ── Constants ──────────────────────────────────────────────
-  const DETECT_THRESHOLD  = 5;   // m/s² — any intentional shake
-  const HARD_THRESHOLD    = 10;  // m/s² — solid deliberate shake
+  const DETECT_THRESHOLD  = 2.5; // m/s² — any intentional shake
+  const HARD_THRESHOLD    = 5;   // m/s² — solid deliberate shake
   const OPEN_DURATION_MS  = 2000; // ms of hard shaking needed
   const SOFT_DELAY_MS     = 1500; // ms before showing "Shake Harder"
   const SAMPLE_WINDOW     = 3;    // samples to average (smaller = more peak-sensitive)
@@ -148,11 +148,10 @@
   }
 
   function vibrateShakeTick(mag) {
-    // Scale pulse: 30ms at DETECT_THRESHOLD → 100ms at HARD_THRESHOLD
-    // (Android motors need ≥30ms to produce perceptible haptic feedback)
+    // Scale pulse: 80ms at DETECT_THRESHOLD → 200ms at HARD_THRESHOLD
     const t = Math.max(0, Math.min(1,
       (mag - DETECT_THRESHOLD) / (HARD_THRESHOLD - DETECT_THRESHOLD)));
-    vibrate([Math.round(30 + t * 70)]);
+    vibrate([Math.round(80 + t * 120)]);
   }
 
   // ── Audio ───────────────────────────────────────────────────
