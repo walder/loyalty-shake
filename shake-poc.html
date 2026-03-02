@@ -132,11 +132,22 @@
   const OPEN_DURATION_MS  = 2000; // ms of hard shaking needed
   const SOFT_DELAY_MS     = 1500; // ms before showing "Shake Harder"
   const SAMPLE_WINDOW     = 5;    // samples to average
+  const VIBRATE_TICK_MS   = 200;  // ms between continuous shake pulses
 
   // ── Vibration ──────────────────────────────────────────────
   const CAN_VIBRATE = 'vibrate' in navigator;
   function vibrate(pattern) {
     if (CAN_VIBRATE) navigator.vibrate(pattern);
+  }
+
+  function vibrateShakeTick(mag, now) {
+    if (!CAN_VIBRATE) return;
+    if (now - lastVibrateTick < VIBRATE_TICK_MS) return;
+    lastVibrateTick = now;
+    // Scale pulse: 10ms at DETECT_THRESHOLD → 40ms at HARD_THRESHOLD
+    const t = Math.max(0, Math.min(1,
+      (mag - DETECT_THRESHOLD) / (HARD_THRESHOLD - DETECT_THRESHOLD)));
+    navigator.vibrate([Math.round(10 + t * 30)]);
   }
 
   // ── Audio ───────────────────────────────────────────────────
@@ -300,10 +311,7 @@
 
       setShakeVolume(mag);
 
-      if (now - lastVibrateTick > 500) {
-        vibrate([15]);
-        lastVibrateTick = now;
-      }
+      vibrateShakeTick(mag, now);
 
       if (state !== 'shaking' && state !== 'opened') applyState('shaking');
       else if (state !== 'opened') {
@@ -323,10 +331,10 @@
     } else if (mag >= DETECT_THRESHOLD) {
       // Soft shaking ─────────────────────────────────────────
       hardShakingSince = null;
-      lastVibrateTick = 0;
       setRing(0);
 
       setShakeVolume(mag);
+      vibrateShakeTick(mag, now);
 
       if (softShakingSince === null) softShakingSince = now;
       const softElapsed = now - softShakingSince;
