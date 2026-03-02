@@ -319,11 +319,19 @@
   // ── Permission / setup ─────────────────────────────────────
   function startListening() {
     initAudio();
-    if (audioCtx) audioCtx.resume(); // direkt in der User-Geste resumieren
+    if (audioCtx) {
+      // iOS requires playing a sound (even silent) inside a user gesture to unlock audio
+      const silence = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+      const silenceSource = audioCtx.createBufferSource();
+      silenceSource.buffer = silence;
+      silenceSource.connect(audioCtx.destination);
+      silenceSource.start();
+      audioCtx.resume();
+    }
     document.addEventListener('touchstart', () => { if (audioCtx) audioCtx.resume(); }, { once: true });
     window.addEventListener('devicemotion', onDeviceMotion);
     startBtn.classList.add('hidden');
-    statusEl.style.display = '';
+    statusEl.style.display = 'block';
   }
 
   function requestPermission() {
