@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shake PoC</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #111;
+      color: #fff;
+      transition: background 0.4s ease;
+      user-select: none;
+    }
+
+    #status-text {
+      font-size: clamp(2.5rem, 12vw, 5rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      text-align: center;
+      transition: color 0.3s ease;
+      line-height: 1.1;
+    }
+
+    /* Ring progress */
+    #ring-wrap {
+      margin-top: 2.5rem;
+      position: relative;
+      width: 140px;
+      height: 140px;
+    }
+
+    #ring-svg {
+      width: 140px;
+      height: 140px;
+      transform: rotate(-90deg);
+    }
+
+    #ring-bg {
+      fill: none;
+      stroke: #333;
+      stroke-width: 10;
+    }
+
+    #ring-progress {
+      fill: none;
+      stroke: #4caf50;
+      stroke-width: 10;
+      stroke-linecap: round;
+      stroke-dasharray: 376; /* 2π × 60 ≈ 376.99 */
+      stroke-dashoffset: 376;
+      transition: stroke-dashoffset 0.2s linear, stroke 0.3s ease;
+    }
+
+    #ring-pct {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #aaa;
+    }
+
+    /* Start button (iOS permission) */
+    #start-btn {
+      margin-top: 3rem;
+      padding: 1rem 2.5rem;
+      font-size: 1.2rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 999px;
+      background: #fff;
+      color: #111;
+      cursor: pointer;
+      transition: opacity 0.3s ease, transform 0.15s ease;
+    }
+    #start-btn:active { transform: scale(0.96); }
+    #start-btn.hidden { display: none; }
+
+    /* Debug bar */
+    #debug {
+      position: fixed;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.75rem;
+      color: #555;
+      text-align: center;
+      pointer-events: none;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* State colour tokens */
+    body.state-idle    { --accent: #e53935; }
+    body.state-shaking { --accent: #fb8c00; }
+    body.state-shake-harder { --accent: #e53935; }
+    body.state-opened  { --accent: #43a047; }
+  </style>
+</head>
+<body class="state-idle">
+
+  <div id="status-text">Shake It</div>
+
+  <div id="ring-wrap">
+    <svg id="ring-svg" viewBox="0 0 140 140">
+      <circle id="ring-bg" cx="70" cy="70" r="60"/>
+      <circle id="ring-progress" cx="70" cy="70" r="60"/>
+    </svg>
+    <div id="ring-pct">0%</div>
+  </div>
+
+  <button id="start-btn">Start</button>
+
+  <div id="debug">accel: — &nbsp;|&nbsp; state: idle</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Constants ──────────────────────────────────────────────
+  const DETECT_THRESHOLD  = 8;   // m/s² — any intentional shake
+  const HARD_THRESHOLD    = 15;  // m/s² — solid deliberate shake
+  const OPEN_DURATION_MS  = 2000; // ms of hard shaking needed
+  const SOFT_DELAY_MS     = 1500; // ms before showing "Shake Harder"
+  const SAMPLE_WINDOW     = 5;    // samples to average
+
+  // ── Vibration ──────────────────────────────────────────────
+  const CAN_VIBRATE = 'vibrate' in navigator;
+  function vibrate(pattern) {
+    if (CAN_VIBRATE) navigator.vibrate(pattern);
+  }
+
+  // ── Audio ───────────────────────────────────────────────────
+  let audioCtx    = null;
+  let gainNode    = null;
+  let shakeBuffer = null;   // trimmed 4-second AudioBuffer
+  let shakeSource = null;   // currently playing AudioBufferSourceNode
+
+  function initAudio() {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = 0;
+      gainNode.connect(audioCtx.destination);
+    } catch (e) { return; }
+
+    fetch('sample-sound.mp3')
+      .then(r => r.arrayBuffer())
+      .then(ab => audioCtx.decodeAudioData(ab))
+      .then(full => {
+        const frames = Math.min(Math.floor(4 * full.sampleRate), full.length);
+        const buf = audioCtx.createBuffer(full.numberOfChannels, frames, full.sampleRate);
+        for (let ch = 0; ch < full.numberOfChannels; ch++) {
+          buf.getChannelData(ch).set(full.getChannelData(ch).subarray(0, frames));
+        }
+        shakeBuffer = buf;
+      })
+      .catch(() => {}); // silent failure — audio just won't play
+  }
+
+  function startShakeSound() {
+    if (!audioCtx || !shakeBuffer || shakeSource) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    shakeSource = audioCtx.createBufferSource();
+    shakeSource.buffer = shakeBuffer;
+    shakeSource.loop = true;
+    shakeSource.connect(gainNode);
+    shakeSource.start();
+    gainNode.gain.setTargetAtTime(0.6, audioCtx.currentTime, 0.08);
+  }
+
+  function stopShakeSound() {
+    if (!shakeSource) return;
+    gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12);
+    const src = shakeSource;
+    shakeSource = null;
+    setTimeout(() => { try { src.stop(); } catch (e) {} }, 400);
+  }
+
+  function setShakeVolume(mag) {
+    if (!gainNode || !shakeSource) return;
+    const t = Math.max(0, Math.min(1,
+      (mag - DETECT_THRESHOLD) / (HARD_THRESHOLD - DETECT_THRESHOLD)));
+    gainNode.gain.setTargetAtTime(0.3 + t * 0.7, audioCtx.currentTime, 0.05);
+  }
+
+  // ── State ──────────────────────────────────────────────────
+  let state = 'idle';
+  let locked = false;            // once opened, no more transitions
+
+  let softShakingSince = null;   // timestamp when soft shaking began
+  let hardShakingSince = null;   // timestamp when hard shaking began
+  let lastVibrateTick  = 0;      // timestamp of last progress-tick vibration
+
+  const samples = [];            // rolling window of magnitude values
+
+  // ── DOM refs ───────────────────────────────────────────────
+  const bodyEl       = document.body;
+  const statusEl     = document.getElementById('status-text');
+  const ringProgress = document.getElementById('ring-progress');
+  const ringPct      = document.getElementById('ring-pct');
+  const startBtn     = document.getElementById('start-btn');
+  const debugEl      = document.getElementById('debug');
+
+  const CIRCUMFERENCE = 2 * Math.PI * 60; // ≈ 376.99
+
+  // ── UI helpers ─────────────────────────────────────────────
+  const STATE_CONFIG = {
+    idle:         { label: 'Shake It',     cls: 'state-idle',         color: '#e53935' },
+    shaking:      { label: 'Shaking',      cls: 'state-shaking',      color: '#fb8c00' },
+    shake_harder: { label: 'Shake Harder', cls: 'state-shake-harder', color: '#e53935' },
+    opened:       { label: 'Opened!',      cls: 'state-opened',       color: '#43a047' },
+  };
+
+  function applyState(newState) {
+    if (state === newState) return;
+    state = newState;
+    switch (newState) {
+      case 'shaking':      vibrate([30]);                    break;
+      case 'shake_harder': vibrate([50, 80, 50]);            break;
+      case 'opened':       vibrate([100, 50, 100, 50, 200]); break;
+      case 'idle':         vibrate(0);                       break;
+    }
+    switch (newState) {
+      case 'shaking':      startShakeSound();  break;
+      case 'shake_harder': /* sound keeps playing */ break;
+      case 'opened':       stopShakeSound();   break;
+      case 'idle':         stopShakeSound();   break;
+    }
+    const cfg = STATE_CONFIG[newState];
+    statusEl.textContent = cfg.label;
+    statusEl.style.color = cfg.color;
+    bodyEl.className = cfg.cls;
+    if (newState !== 'opened') {
+      setRing(0);
+    }
+  }
+
+  function setRing(fraction) {
+    const offset = CIRCUMFERENCE * (1 - Math.min(1, Math.max(0, fraction)));
+    ringProgress.style.strokeDashoffset = offset.toFixed(1);
+    const pct = Math.round(fraction * 100);
+    ringPct.textContent = pct + '%';
+  }
+
+  // ── Motion processing ──────────────────────────────────────
+  function getMagnitude(event) {
+    let ax, ay, az;
+
+    if (event.acceleration &&
+        event.acceleration.x != null) {
+      ax = event.acceleration.x;
+      ay = event.acceleration.y;
+      az = event.acceleration.z;
+    } else if (event.accelerationIncludingGravity &&
+               event.accelerationIncludingGravity.x != null) {
+      // crude gravity removal on z axis
+      ax = event.accelerationIncludingGravity.x;
+      ay = event.accelerationIncludingGravity.y;
+      az = (event.accelerationIncludingGravity.z || 0) - 9.81;
+    } else {
+      return 0;
+    }
+
+    return Math.sqrt(ax * ax + ay * ay + az * az);
+  }
+
+  function smoothedMagnitude(raw) {
+    samples.push(raw);
+    if (samples.length > SAMPLE_WINDOW) samples.shift();
+    return samples.reduce((s, v) => s + v, 0) / samples.length;
+  }
+
+  function onDeviceMotion(event) {
+    if (locked) return;
+
+    const raw  = getMagnitude(event);
+    const mag  = smoothedMagnitude(raw);
+    const now  = performance.now();
+
+    debugEl.textContent = `accel: ${mag.toFixed(1)} m/s²  |  state: ${state}`;
+
+    if (mag >= HARD_THRESHOLD) {
+      // Hard shaking ─────────────────────────────────────────
+      softShakingSince = null;
+      if (hardShakingSince === null) hardShakingSince = now;
+
+      const elapsed = now - hardShakingSince;
+      const fraction = elapsed / OPEN_DURATION_MS;
+      setRing(fraction);
+
+      setShakeVolume(mag);
+
+      if (now - lastVibrateTick > 500) {
+        vibrate([15]);
+        lastVibrateTick = now;
+      }
+
+      if (state !== 'shaking' && state !== 'opened') applyState('shaking');
+      else if (state !== 'opened') {
+        // keep label as "Shaking" while ring fills
+        if (statusEl.textContent !== 'Shaking') statusEl.textContent = 'Shaking';
+        statusEl.style.color = STATE_CONFIG.shaking.color;
+        bodyEl.className = STATE_CONFIG.shaking.cls;
+        state = 'shaking';
+      }
+
+      if (elapsed >= OPEN_DURATION_MS) {
+        applyState('opened');
+        locked = true;
+        setRing(1);
+      }
+
+    } else if (mag >= DETECT_THRESHOLD) {
+      // Soft shaking ─────────────────────────────────────────
+      hardShakingSince = null;
+      lastVibrateTick = 0;
+      setRing(0);
+
+      setShakeVolume(mag);
+
+      if (softShakingSince === null) softShakingSince = now;
+      const softElapsed = now - softShakingSince;
+
+      if (state === 'idle') {
+        applyState('shaking');
+      } else if (softElapsed >= SOFT_DELAY_MS && state !== 'shake_harder') {
+        applyState('shake_harder');
+      }
+
+    } else {
+      // Below detect threshold ────────────────────────────────
+      hardShakingSince = null;
+      softShakingSince = null;
+      lastVibrateTick = 0;
+      vibrate(0);
+      setRing(0);
+
+      if (state !== 'idle') applyState('idle');
+    }
+  }
+
+  // ── Permission / setup ─────────────────────────────────────
+  function startListening() {
+    initAudio();
+    // Resume on any touch (needed when AudioContext was created before user gesture)
+    document.addEventListener('touchstart', () => { if (audioCtx) audioCtx.resume(); }, { once: true });
+    window.addEventListener('devicemotion', onDeviceMotion);
+    startBtn.classList.add('hidden');
+  }
+
+  function requestPermission() {
+    if (typeof DeviceMotionEvent !== 'undefined' &&
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      DeviceMotionEvent.requestPermission()
+        .then(function (result) {
+          if (result === 'granted') {
+            startListening();
+          } else {
+            statusEl.textContent = 'Permission denied';
+          }
+        })
+        .catch(function (err) {
+          statusEl.textContent = 'Error: ' + err.message;
+        });
+    } else {
+      // Non-iOS: permission not needed
+      startListening();
+    }
+  }
+
+  startBtn.addEventListener('click', requestPermission);
+
+  // Auto-start on non-iOS where no permission is needed
+  if (typeof DeviceMotionEvent === 'undefined' ||
+      typeof DeviceMotionEvent.requestPermission !== 'function') {
+    startListening();
+    startBtn.classList.add('hidden');
+  }
+
+})();
+</script>
+</body>
+</html>
