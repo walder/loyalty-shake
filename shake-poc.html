@@ -129,10 +129,10 @@
   // ── Constants ──────────────────────────────────────────────
   const DETECT_THRESHOLD  = 2.5; // m/s² — any intentional shake
   const HARD_THRESHOLD    = 5;   // m/s² — solid deliberate shake
-  const OPEN_DURATION_MS  = 2000; // ms of hard shaking needed
-  const SOFT_DELAY_MS     = 1500; // ms before showing "Shake Harder"
+  const OPEN_DURATION_MS  = 1500; // ms of hard shaking needed
+  const SOFT_DELAY_MS     = 1000; // ms before showing "Shake Harder"
   const SAMPLE_WINDOW     = 3;    // samples to average (smaller = more peak-sensitive)
-  const VIBRATE_MUTEX_MS  = 1000; // ms minimum between any two vibrate starts
+  const VIBRATE_MUTEX_MS  = 200; // ms minimum between any two vibrate starts
 
   // ── Vibration ──────────────────────────────────────────────
   const CAN_VIBRATE = 'vibrate' in navigator;
