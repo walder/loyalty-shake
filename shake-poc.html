@@ -46,6 +46,21 @@
     #start-btn:active { transform: scale(0.96); }
     #start-btn.hidden { display: none; }
 
+    #restart-btn {
+      margin-top: 2rem;
+      padding: 0.9rem 2.5rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 999px;
+      background: #fff;
+      color: #111;
+      cursor: pointer;
+      transition: opacity 0.3s ease, transform 0.15s ease;
+    }
+    #restart-btn:active { transform: scale(0.96); }
+    #restart-btn.hidden { display: none; }
+
     /* Debug bar */
     #debug {
       position: fixed;
@@ -71,6 +86,7 @@
   <div id="status-text">Shake It</div>
 
   <button id="start-btn">Start</button>
+  <button id="restart-btn" class="hidden">Nochmal</button>
 
   <div id="debug">accel: — &nbsp;|&nbsp; state: idle</div>
 
@@ -135,15 +151,20 @@
   }
 
   function startShakeSound() {
-    if (!audioCtx || !shakeBuffer || shakeSource) return;
+    if (!audioCtx || !shakeBuffer) return;
     const doStart = () => {
-      if (shakeSource) return; // re-check nach async resume
+      gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+      if (shakeSource) {
+        // Source läuft bereits – nur Gain hochfahren
+        gainNode.gain.setTargetAtTime(0.6, audioCtx.currentTime, 0.1);
+        return;
+      }
       shakeSource = audioCtx.createBufferSource();
       shakeSource.buffer = shakeBuffer;
       shakeSource.loop = true;
       shakeSource.connect(gainNode);
       shakeSource.start();
-      gainNode.gain.setTargetAtTime(0.6, audioCtx.currentTime, 0.08);
+      gainNode.gain.setTargetAtTime(0.6, audioCtx.currentTime, 0.1);
     };
     if (audioCtx.state !== 'running') {
       audioCtx.resume().then(doStart);
@@ -152,19 +173,26 @@
     }
   }
 
-  function stopShakeSound() {
+  // hard=false: Gain auf 0 fahren, Source weiterlaufen lassen (Idle-Übergang)
+  // hard=true:  Source tatsächlich stoppen (Opened-Zustand)
+  function stopShakeSound(hard = false) {
     if (!shakeSource) return;
-    gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12);
-    const src = shakeSource;
-    shakeSource = null;
-    setTimeout(() => { try { src.stop(); } catch (e) {} }, 400);
+    gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+    gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, hard ? 0.1 : 0.3);
+    if (hard) {
+      const src = shakeSource;
+      shakeSource = null;
+      setTimeout(() => { try { src.stop(); } catch (e) {} }, 400);
+    }
   }
 
   function setShakeVolume(mag) {
     if (!gainNode || !shakeSource) return;
     const t = Math.max(0, Math.min(1,
       (mag - DETECT_THRESHOLD) / (HARD_THRESHOLD - DETECT_THRESHOLD)));
-    gainNode.gain.setTargetAtTime(0.3 + t * 0.7, audioCtx.currentTime, 0.05);
+    gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+    gainNode.gain.setTargetAtTime(0.3 + t * 0.7, audioCtx.currentTime, 0.08);
+    shakeSource.playbackRate.setTargetAtTime(0.95 + t * 0.1, audioCtx.currentTime, 0.15);
   }
 
   // ── State ──────────────────────────────────────────────────
@@ -180,6 +208,7 @@
   const bodyEl       = document.body;
   const statusEl     = document.getElementById('status-text');
   const startBtn     = document.getElementById('start-btn');
+  const restartBtn   = document.getElementById('restart-btn');
   const debugEl      = document.getElementById('debug');
 
 
@@ -203,13 +232,23 @@
     switch (newState) {
       case 'shaking':      startShakeSound();  break;
       case 'shake_harder': /* sound keeps playing */ break;
-      case 'opened':       stopShakeSound();   break;
-      case 'idle':         stopShakeSound();   break;
+      case 'opened':       stopShakeSound(true);  break;
+      case 'idle':         stopShakeSound(false); break;
     }
+    restartBtn.classList.toggle('hidden', newState !== 'opened');
     const cfg = STATE_CONFIG[newState];
     statusEl.textContent = cfg.label;
     statusEl.style.color = cfg.color;
     bodyEl.className = cfg.cls;
+  }
+
+  function resetGame() {
+    locked = false;
+    softShakingSince = null;
+    hardShakingSince = null;
+    samples.length = 0;
+    state = 'opened'; // force applyState to not skip
+    applyState('idle');
   }
 
   // ── Motion processing ──────────────────────────────────────
@@ -355,6 +394,7 @@
   }
 
   startBtn.addEventListener('click', requestPermission);
+  restartBtn.addEventListener('click', resetGame);
 
 
 })();
