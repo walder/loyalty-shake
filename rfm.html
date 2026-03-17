@@ -1,86 +1,148 @@
 
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
-.seg { border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 8px; }
-.seg-name { font-size: 13px; font-weight: 500; text-align: center; line-height: 1.3; }
-.seg-count { font-size: 12px; margin-top: 5px; text-align: center; }
-.seg-pct { font-size: 11px; opacity: 0.75; text-align: center; }
-.seg-detail { font-size: 10px; opacity: 0.65; text-align: center; margin-top: 3px; }
-.c-blue  { background: #E6F1FB; color: #185FA5; }
-.c-teal  { background: #E1F5EE; color: #0F6E56; }
-.c-red   { background: #FAECE7; color: #993C1D; }
-.c-yell  { background: #FAEEDA; color: #854F0B; }
-.c-gray  { background: #F1EFE8; color: #444441; }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Lato', sans-serif; }
+.wrap { width: 100%; padding: 0.5rem 0; }
+.outer { display: flex; align-items: stretch; }
+.y-title { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; font-weight: 700; color: var(--color-text-primary); letter-spacing: 1.5px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; padding-right: 8px; }
+.y-labels { display: flex; flex-direction: column; width: 24px; }
+.y-lbl { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--color-text-secondary); }
+.grid-wrap { flex: 1; display: flex; flex-direction: column; }
+.matrix { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); gap: 0; height: 420px; border-radius: var(--border-radius-lg); overflow: hidden; background: #fff; }
+@media (prefers-color-scheme: dark) { .matrix { background: var(--color-background-primary); } }
+.cell { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 4px; cursor: default; transition: opacity 0.18s; }
+.cell:hover { opacity: 0.8; }
+.c-name { font-weight: 900; font-size: 12px; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.3px; }
+.c-count { font-size: 17px; font-weight: 700; line-height: 1.2; margin-top: 2px; }
+.c-pct { font-size: 11px; font-weight: 400; opacity: 0.85; margin-top: 1px; }
+.c-detail { font-size: 10px; font-weight: 400; opacity: 0.7; margin-top: 3px; }
+.x-labels { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 6px; }
+.x-lbl { text-align: center; font-size: 12px; font-weight: 700; color: var(--color-text-secondary); }
+.x-title { text-align: center; font-size: 11px; font-weight: 700; color: var(--color-text-primary); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px; font-size: 11px; color: var(--color-text-secondary); }
+.leg { display: flex; align-items: center; gap: 5px; }
+.ldot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.tooltip { position: fixed; pointer-events: none; background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 10px 14px; font-size: 12px; color: var(--color-text-primary); z-index: 999; display: none; line-height: 1.7; white-space: nowrap; }
+.tooltip b { font-weight: 700; }
+.tt-l { color: var(--color-text-secondary); }
+.seg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
 </style>
 
-<div style="padding:1rem 0;font-family:var(--font-sans);">
-
-<div style="display:grid;grid-template-columns:20px 28px 1fr;grid-template-rows:1fr 1fr 22px 22px;height:520px;gap:0;">
-
-  <div style="grid-column:1;grid-row:1/3;writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;color:var(--color-text-secondary);display:flex;align-items:center;justify-content:center;">Frequency Score</div>
-
-  <div style="grid-column:2;grid-row:1/3;display:grid;grid-template-rows:1fr 1fr;font-size:10px;color:var(--color-text-secondary);text-align:right;padding-right:4px;">
-    <span style="display:flex;align-items:center;justify-content:flex-end;">hoch (3–5)</span>
-    <span style="display:flex;align-items:center;justify-content:flex-end;">tief (1–2)</span>
-  </div>
-
-  <div style="grid-column:3;grid-row:1;display:grid;grid-template-columns:1.5fr 2fr 2.5fr;gap:3px;padding-bottom:1.5px;">
-    <div class="seg c-red">
-      <div class="seg-name">At Risk</div>
-      <div class="seg-count">6,812</div>
-      <div class="seg-pct">10.7%</div>
-      <div class="seg-detail">Ø 133 Tage · CHF 60</div>
-    </div>
-    <div class="seg c-teal">
-      <div class="seg-name">Loyal Customers</div>
-      <div class="seg-count">13,665</div>
-      <div class="seg-pct">21.5%</div>
-      <div class="seg-detail">Ø 64 Tage · CHF 55</div>
-    </div>
-    <div class="seg c-blue">
-      <div class="seg-name">Champions</div>
-      <div class="seg-count">17,702</div>
-      <div class="seg-pct">27.8%</div>
-      <div class="seg-detail">Ø 46 Tage · CHF 80</div>
+<div class="wrap">
+  <div class="outer">
+    <div class="y-title">Frequency Score</div>
+    <div class="y-labels" id="ylabels"></div>
+    <div class="grid-wrap">
+      <div class="matrix" id="matrix">
+        <svg class="seg-overlay" id="borders" viewBox="0 0 500 420" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="x-labels" id="xlabels"></div>
+      <div class="x-title">Recency Score</div>
     </div>
   </div>
-
-  <div style="grid-column:3;grid-row:2;display:grid;grid-template-columns:1.5fr 2fr 2.5fr;gap:3px;padding-top:1.5px;">
-    <div class="seg c-gray">
-      <div class="seg-name">Lost</div>
-      <div class="seg-count">18,642</div>
-      <div class="seg-pct">29.3%</div>
-      <div class="seg-detail">Ø 134 Tage · CHF 45</div>
-    </div>
-    <div class="seg c-yell" style="grid-column:2/4;">
-      <div class="seg-name">Promising</div>
-      <div class="seg-count">6,812</div>
-      <div class="seg-pct">10.7%</div>
-      <div class="seg-detail">Ø 91 Tage · CHF 49</div>
-    </div>
-  </div>
-
-  <div style="grid-column:3;grid-row:3;display:grid;grid-template-columns:1.5fr 2fr 2.5fr;font-size:10px;color:var(--color-text-secondary);text-align:center;">
-    <span style="display:flex;align-items:center;justify-content:center;">tief (1–2)</span>
-    <span style="display:flex;align-items:center;justify-content:center;">mittel (3)</span>
-    <span style="display:flex;align-items:center;justify-content:center;">hoch (4–5)</span>
-  </div>
-
-  <div style="grid-column:2/5;grid-row:4;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--color-text-secondary);">Recency Score</div>
-
+  <div class="legend" id="legend"></div>
 </div>
+<div class="tooltip" id="tooltip"></div>
 
-<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11px;">
-  <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#E6F1FB;border:0.5px solid #185FA5;display:inline-block;"></span><span style="color:var(--color-text-secondary)">Champions</span></span>
-  <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#E1F5EE;border:0.5px solid #0F6E56;display:inline-block;"></span><span style="color:var(--color-text-secondary)">Loyal</span></span>
-  <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#FAEEDA;border:0.5px solid #854F0B;display:inline-block;"></span><span style="color:var(--color-text-secondary)">Promising</span></span>
-  <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#FAECE7;border:0.5px solid #993C1D;display:inline-block;"></span><span style="color:var(--color-text-secondary)">At Risk</span></span>
-  <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#F1EFE8;border:0.5px solid #5F5E5A;display:inline-block;"></span><span style="color:var(--color-text-secondary)">Lost</span></span>
-</div>
+<script>
+const total = 63775;
+const S = {
+  champ: { name:'Champions', count:17745, rfm:4.13, r:4.5, f:4.5, rec:47, freq:1.6, mon:79.71, color:'#11D9CC', text:'#fff' },
+  loyal: { name:'Loyal Customers', count:13694, rfm:3.45, r:3.8, f:3.5, rec:65, freq:1.1, mon:54.83, color:'#3D4F5F', text:'#fff' },
+  cant:  { name:"Can't Lose Them", count:638, rfm:3.37, r:1, f:5, rec:150, freq:2.1, mon:100.41, color:'#FFC75F', text:'#412402' },
+  risk:  { name:'At Risk', count:2376, rfm:3.14, r:2, f:4, rec:117, freq:1.6, mon:75.37, color:'#FF6B6B', text:'#fff' },
+  prom:  { name:'Promising', count:6826, rfm:2.39, r:3, f:1.3, rec:92, freq:1, mon:49.02, color:'#48D1A5', text:'#04342C' },
+  sleep: { name:'About to Sleep', count:10379, rfm:1.98, r:2, f:1.2, rec:111, freq:1, mon:45.42, color:'#8B7EC8', text:'#fff' },
+  lost:  { name:'Lost', count:12117, rfm:2.0, r:1, f:2.3, rec:157, freq:1, mon:44.02, color:'#0A7E78', text:'#E1F5EE' },
+};
 
-<div style="margin-top:10px;padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-secondary);">
-  Total: <span style="font-weight:500;color:var(--color-text-primary);">63,633</span> Kunden &nbsp;·&nbsp;
-  Top Segmente: <span style="font-weight:500;color:#185FA5;">Champions + Loyal = 49.3%</span> &nbsp;·&nbsp;
-  Reaktivierung: <span style="font-weight:500;color:#854F0B;">Lost + At Risk = 40.0%</span>
-</div>
+const grid = [
+  [S.cant,  S.cant,  S.loyal, S.champ, S.champ],
+  [S.risk,  S.risk,  S.loyal, S.champ, S.champ],
+  [S.risk,  S.risk,  S.loyal, S.loyal, S.loyal],
+  [S.lost,  S.sleep, S.sleep, S.prom,  S.prom ],
+  [S.lost,  S.lost,  S.sleep, S.prom,  S.prom ],
+];
 
-</div>
+const labelPos = {
+  'Champions':       [0, 4],
+  'Loyal Customers': [1, 2],
+  "Can't Lose Them": [0, 0],
+  'At Risk':         [2, 0],
+  'Promising':       [3, 4],
+  'About to Sleep':  [4, 2],
+  'Lost':            [4, 0],
+};
+
+const matrix = document.getElementById('matrix');
+const tooltip = document.getElementById('tooltip');
+
+for (let r = 0; r < 5; r++) {
+  for (let c = 0; c < 5; c++) {
+    const seg = grid[r][c];
+    const el = document.createElement('div');
+    el.className = 'cell';
+    el.style.background = seg.color;
+    el.style.gridRow = (r + 1);
+    el.style.gridColumn = (c + 1);
+
+    const lp = labelPos[seg.name];
+    if (lp && lp[0] === r && lp[1] === c) {
+      const pct = ((seg.count / total) * 100).toFixed(1);
+      el.innerHTML = `
+        <div class="c-name" style="color:${seg.text}">${seg.name}</div>
+        <div class="c-count" style="color:${seg.text}">${seg.count.toLocaleString('de-CH')}</div>
+        <div class="c-pct" style="color:${seg.text}">${pct}%</div>
+        <div class="c-detail" style="color:${seg.text}">Ø ${seg.rec} Tage · CHF ${Math.round(seg.mon)}</div>
+      `;
+    }
+
+    el.addEventListener('mouseenter', e => {
+      const pct = ((seg.count / total) * 100).toFixed(1);
+      tooltip.style.display = 'block';
+      tooltip.innerHTML = `<div style="font-weight:700;font-size:14px;margin-bottom:2px;">${seg.name}</div>
+        <span class="tt-l">Kunden:</span> <b>${seg.count.toLocaleString('de-CH')}</b> (${pct}%)<br>
+        <span class="tt-l">RFM-Score:</span> <b>${seg.rfm}</b><br>
+        <span class="tt-l">R-Score:</span> <b>${seg.r}</b> · <span class="tt-l">F-Score:</span> <b>${seg.f}</b><br>
+        <span class="tt-l">Ø Recency Tage:</span> <b>${seg.rec}</b><br>
+        <span class="tt-l">Ø Frequency:</span> <b>${seg.freq}</b><br>
+        <span class="tt-l">Ø Monetary:</span> <b>${seg.mon.toFixed(2)} CHF</b>`;
+    });
+    el.addEventListener('mousemove', e => {
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+    });
+    el.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+    matrix.appendChild(el);
+  }
+}
+
+const cw = 100, ch = 84;
+const svg = document.getElementById('borders');
+let lines = '';
+for (let r = 0; r < 5; r++) {
+  for (let c = 0; c < 5; c++) {
+    const seg = grid[r][c];
+    const x = c * cw, y = r * ch;
+    if (c < 4 && grid[r][c + 1].name !== seg.name) {
+      lines += `<line x1="${x + cw}" y1="${y}" x2="${x + cw}" y2="${y + ch}" stroke="white" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
+    }
+    if (r < 4 && grid[r + 1][c].name !== seg.name) {
+      lines += `<line x1="${x}" y1="${y + ch}" x2="${x + cw}" y2="${y + ch}" stroke="white" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
+    }
+  }
+}
+svg.innerHTML = lines;
+
+const yl = document.getElementById('ylabels');
+[5,4,3,2,1].forEach(n => { const d = document.createElement('div'); d.className = 'y-lbl'; d.textContent = n; yl.appendChild(d); });
+
+const xl = document.getElementById('xlabels');
+[1,2,3,4,5].forEach(n => { const d = document.createElement('div'); d.className = 'x-lbl'; d.textContent = n; xl.appendChild(d); });
+
+const legend = document.getElementById('legend');
+[S.champ, S.loyal, S.prom, S.cant, S.risk, S.sleep, S.lost].forEach(d => {
+  const pct = ((d.count / total) * 100).toFixed(1);
+  legend.innerHTML += `<span class="leg"><span class="ldot" style="background:${d.color}"></span>${d.name} · ${d.count.toLocaleString('de-CH')} (${pct}%)</span>`;
+});
+</script>
